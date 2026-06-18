@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>久坐提醒倒數器</title>
+  <style>
+    :root {
+      --bg: #f6f7f2;
+      --ink: #202421;
+      --muted: #646b64;
+      --line: #d8ded4;
+      --panel: #ffffff;
+      --accent: #24745f;
+      --accent-dark: #185342;
+      --warm: #f0b84a;
+      --danger: #b84d3f;
+      --shadow: 0 18px 50px rgba(32, 36, 33, 0.12);
+      --ring-size: clamp(250px, 42vw, 430px);
+      --ring-stroke: 16;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(36, 116, 95, 0.08), transparent 36%),
+        linear-gradient(315deg, rgba(240, 184, 74, 0.18), transparent 34%),
+        var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    main {
+      width: min(960px, 100%);
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .timer-shell,
+    .settings {
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .timer-shell {
+      padding: clamp(22px, 4vw, 42px);
+      display: grid;
+      gap: 24px;
+      align-content: center;
+      min-height: 560px;
+    }
+
+    .topline {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--warm);
+      display: inline-block;
+      margin-right: 8px;
+      vertical-align: -1px;
+    }
+
+    .status-dot.running {
+      background: var(--accent);
+      box-shadow: 0 0 0 6px rgba(36, 116, 95, 0.12);
+    }
+
+    .timer-face {
+      width: var(--ring-size);
+      height: var(--ring-size);
+      justify-self: center;
+      position: relative;
+      display: grid;
+      place-items: center;
+    }
+
+    .timer-ring {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+      filter: drop-shadow(0 16px 24px rgba(36, 116, 95, 0.12));
+    }
+
+    .ring-track,
+    .ring-progress {
+      fill: none;
+      stroke-width: var(--ring-stroke);
+    }
+
+    .ring-track {
+      stroke: #e4e9df;
+    }
+
+    .ring-progress {
+      stroke: var(--accent);
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.25s linear, stroke 0.2s ease;
+    }
+
+    .timer-face.is-alert .ring-progress {
+      stroke: var(--warm);
+    }
+
+    .timer-face.is-break .ring-progress {
+      stroke: var(--warm);
+    }
+
+    .time {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(54px, 10vw, 104px);
+      line-height: 0.9;
+      letter-spacing: 0;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .message {
+      min-height: 34px;
+      color: var(--muted);
+      text-align: center;
+      font-size: clamp(17px, 2vw, 22px);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      min-height: 48px;
+      padding: 0 16px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      color: var(--ink);
+      background: #eef2ea;
+      border: 1px solid transparent;
+      transition: transform 0.16s ease, background 0.16s ease, color 0.16s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    button.primary:hover {
+      background: var(--accent-dark);
+    }
+
+    button.danger {
+      color: var(--danger);
+      background: #f7e9e6;
+    }
+
+    .settings {
+      padding: 24px;
+      display: grid;
+      gap: 20px;
+      align-content: start;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 40px);
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .note {
+      color: var(--muted);
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .field {
+      display: grid;
+      gap: 9px;
+    }
+
+    label {
+      font-weight: 700;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .minutes-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 14px;
+      background: #f2f5ef;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .minutes-value {
+      font-size: 28px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .quick {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .check {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .phone-sync {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      background: #f2f5ef;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .phone-sync p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .sync-url {
+      display: block;
+      color: var(--accent-dark);
+      font-weight: 800;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      text-decoration: none;
+    }
+
+    .qr-code {
+      width: min(300px, 100%);
+      aspect-ratio: 1;
+      justify-self: center;
+      border: 8px solid #ffffff;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 10px 24px rgba(32, 36, 33, 0.10);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.58;
+      transform: none;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      accent-color: var(--accent);
+      flex: 0 0 auto;
+    }
+
+    .flash {
+      animation: flash 0.9s ease-in-out infinite alternate;
+    }
+
+    @keyframes flash {
+      from { background-color: #fff7df; }
+      to { background-color: #ffffff; }
+    }
+
+    @media (max-width: 760px) {
+      :root {
+        --ring-size: min(76vw, 340px);
+        --ring-stroke: 14;
+      }
+
+      body {
+        padding: 14px;
+      }
+
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .timer-shell {
+        min-height: 430px;
+      }
+
+      .controls,
+      .quick {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="timer-shell" id="timerShell" aria-live="polite">
+      <div class="topline">
+        <span><span class="status-dot" id="statusDot"></span><span id="statusText">準備開始</span></span>
+        <span id="sessionLabel">45 分鐘</span>
+      </div>
+
+      <div class="timer-face" id="timerFace" aria-label="倒數進度">
+        <svg class="timer-ring" viewBox="0 0 240 240" aria-hidden="true">
+          <circle class="ring-track" cx="120" cy="120" r="104"></circle>
+          <circle class="ring-progress" id="ringProgress" cx="120" cy="120" r="104"></circle>
+        </svg>
+        <div class="time" id="timeDisplay">45:00</div>
+      </div>
+
+      <div class="message" id="message">按下開始，讓我幫你顧著時間。</div>
+
+      <div class="controls">
+        <button class="primary" id="startPause">開始</button>
+        <button id="standNow">我現在去走走</button>
+        <button class="danger" id="reset">重設</button>
+      </div>
+    </section>
+
+    <aside class="settings">
+      <div>
+        <h1>久坐提醒倒數器</h1>
+        <p class="note">倒數結束時會提醒你起身走一走，並自動開始 10 分鐘走動倒數。</p>
+      </div>
+
+      <div class="field">
+        <label for="minutes">每隔多久提醒一次</label>
+        <div class="minutes-row">
+          <span>間隔</span>
+          <span class="minutes-value"><span id="minutesValue">45</span> 分</span>
+        </div>
+        <input id="minutes" type="range" min="15" max="90" step="5" value="45">
+      </div>
+
+      <div class="field">
+        <label>快速選擇</label>
+        <div class="quick">
+          <button data-minutes="25">25 分</button>
+          <button data-minutes="45">45 分</button>
+          <button data-minutes="60">60 分</button>
+        </div>
+      </div>
+
+      <label class="check">
+        <input id="sound" type="checkbox" checked>
+        <span>時間到播放提示音</span>
+      </label>
+
+      <button id="notify">允許桌面通知</button>
+
+      <div class="phone-sync">
+        <label>手機 QR CODE</label>
+        <p id="mobileHint">放到網站後，按開始再掃 QR，手機會開一個獨立倒數頁；不用和電腦在同一個網路。</p>
+        <img class="qr-code" id="qrCode" alt="手機倒數 QR CODE">
+        <a class="sync-url" id="mobileLink" href="#" target="_blank" rel="noreferrer">準備中...</a>
+        <button id="copyMobileLink">複製手機倒數連結</button>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const localSyncHost = "163.26.84.36:8788";
+    const searchParams = new URLSearchParams(window.location.search);
+    const isWatchMode = searchParams.get("watch") === "1";
+    const syncBase = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+      ? `http://${localSyncHost}`
+      : window.location.origin;
+    const syncApi = `${syncBase}/api/state`;
+    const mobileUrl = `${syncBase}${window.location.pathname}?watch=1`;
+    const qrApi = "https://api.qrserver.com/v1/create-qr-code/";
+
+    const timeDisplay = document.getElementById("timeDisplay");
+    const minutesInput = document.getElementById("minutes");
+    const minutesValue = document.getElementById("minutesValue");
+    const startPause = document.getElementById("startPause");
+    const resetButton = document.getElementById("reset");
+    const standNow = document.getElementById("standNow");
+    const notifyButton = document.getElementById("notify");
+    const soundInput = document.getElementById("sound");
+    const message = document.getElementById("message");
+    const statusText = document.getElementById("statusText");
+    const statusDot = document.getElementById("statusDot");
+    const sessionLabel = document.getElementById("sessionLabel");
+    const timerFace = document.getElementById("timerFace");
+    const ringProgress = document.getElementById("ringProgress");
+    const timerShell = document.getElementById("timerShell");
+    const mobileHint = document.getElementById("mobileHint");
+    const mobileLink = document.getElementById("mobileLink");
+    const copyMobileLink = document.getElementById("copyMobileLink");
+    const qrCode = document.getElementById("qrCode");
+    const circumference = 2 * Math.PI * Number(ringProgress.getAttribute("r"));
+    const breakSeconds = 10 * 60;
+
+    let totalSeconds = Number(minutesInput.value) * 60;
+    let remainingSeconds = totalSeconds;
+    let timerId = null;
+    let audioContext = null;
+    let currentMode = "work";
+    let endAt = null;
+    let isApplyingRemoteState = false;
+
+    ringProgress.style.strokeDasharray = `${circumference}`;
+
+    if (isWatchMode) {
+      startPause.disabled = true;
+      resetButton.disabled = true;
+      standNow.disabled = true;
+      minutesInput.disabled = true;
+      document.querySelectorAll("[data-minutes]").forEach((button) => {
+        button.disabled = true;
+      });
+      mobileHint.textContent = "這是手機查看模式，會自動同步電腦端目前剩餘時間。";
+      message.textContent = "正在等待電腦端計時狀態...";
+    }
+
+    function buildStandaloneTimerUrl(targetEndAt = Date.now() + remainingSeconds * 1000, mode = currentMode) {
+      const url = new URL("mobile-timer.html", window.location.href);
+      url.searchParams.set("end", String(Number(targetEndAt)));
+      url.searchParams.set("mode", mode);
+      return url.toString();
+    }
+
+    function updateQrCode() {
+      const targetEndAt = endAt || Date.now() + remainingSeconds * 1000;
+      const standaloneUrl = buildStandaloneTimerUrl(targetEndAt, currentMode);
+      const qrUrl = `${qrApi}?size=300x300&margin=10&data=${encodeURIComponent(standaloneUrl)}`;
+      qrCode.src = qrUrl;
+      mobileLink.href = standaloneUrl;
+      mobileLink.textContent = currentMode === "break"
+        ? "手機走動倒數連結已更新"
+        : "手機倒數連結已更新";
+    }
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60).toString().padStart(2, "0");
+      const secs = Math.floor(seconds % 60).toString().padStart(2, "0");
+      return `${mins}:${secs}`;
+    }
+
+    function updateScreen() {
+      timeDisplay.textContent = formatTime(remainingSeconds);
+      minutesValue.textContent = minutesInput.value;
+      sessionLabel.textContent = currentMode === "break" ? "走動 10 分鐘" : `${minutesInput.value} 分鐘`;
+      const progress = totalSeconds === 0 ? 0 : remainingSeconds / totalSeconds;
+      ringProgress.style.strokeDashoffset = `${circumference * (1 - progress)}`;
+      timerFace.classList.toggle("is-alert", remainingSeconds === 0);
+      timerFace.classList.toggle("is-break", currentMode === "break");
+      document.title = currentMode === "break"
+        ? `${formatTime(remainingSeconds)} - 走動倒數`
+        : `${formatTime(remainingSeconds)} - 久坐提醒`;
+    }
+
+    async function publishState() {
+      if (isWatchMode || isApplyingRemoteState) return;
+      const state = {
+        mode: currentMode,
+        totalSeconds,
+        remainingSeconds,
+        running: Boolean(timerId),
+        endAt,
+        minutes: Number(minutesInput.value),
+      };
+      try {
+        await fetch(syncApi, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(state),
+        });
+      } catch (error) {
+        mobileHint.textContent = "手機同步服務尚未連上；本機倒數仍可正常使用。";
+      }
+    }
+
+    function applyRemoteState(state) {
+      if (!state || !state.mode) return;
+      isApplyingRemoteState = true;
+      currentMode = state.mode;
+      totalSeconds = Number(state.totalSeconds) || Number(minutesInput.value) * 60;
+      endAt = state.endAt || null;
+      if (state.minutes) {
+        minutesInput.value = state.minutes;
+      }
+      if (state.running && endAt) {
+        remainingSeconds = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+        setRunning(true);
+        message.textContent = currentMode === "break"
+          ? "走動倒數中，慢慢伸展一下。"
+          : "電腦端正在計時中。";
+      } else {
+        remainingSeconds = Math.max(0, Number(state.remainingSeconds) || 0);
+        setRunning(false);
+        message.textContent = remainingSeconds > 0 ? "電腦端目前已暫停。" : "目前沒有進行中的倒數。";
+      }
+      updateScreen();
+      isApplyingRemoteState = false;
+    }
+
+    async function pollRemoteState() {
+      if (!isWatchMode) return;
+      try {
+        const response = await fetch(syncApi, { cache: "no-store" });
+        if (!response.ok) return;
+        applyRemoteState(await response.json());
+      } catch (error) {
+        message.textContent = "暫時連不上電腦端同步服務。";
+      }
+    }
+
+    function setRunning(running) {
+      statusDot.classList.toggle("running", running);
+      statusText.textContent = running
+        ? (currentMode === "break" ? "走動中" : "計時中")
+        : "已暫停";
+      startPause.textContent = running ? "暫停" : "開始";
+    }
+
+    function stopTimer() {
+      window.clearInterval(timerId);
+      timerId = null;
+      setRunning(false);
+      publishState();
+    }
+
+    function playBeep() {
+      if (!soundInput.checked) return;
+      audioContext = audioContext || new AudioContext();
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(740, audioContext.currentTime);
+      gain.gain.setValueAtTime(0.001, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.2, audioContext.currentTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.45);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.5);
+    }
+
+    function showNotification(title, body) {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body });
+      }
+    }
+
+    function notifyWorkDone() {
+      playBeep();
+      timerShell.classList.add("flash");
+      message.textContent = "時間到，起身走一走。現在開始 10 分鐘走動倒數。";
+      statusText.textContent = "該走動了";
+      statusDot.classList.remove("running");
+      showNotification("該起身走走了", "離開座位一下，接下來自動計時 10 分鐘。");
+    }
+
+    function notifyBreakDone() {
+      playBeep();
+      timerShell.classList.add("flash");
+      message.textContent = "10 分鐘到了。回來後按開始，就能進入下一輪。";
+      statusText.textContent = "走動完成";
+      statusDot.classList.remove("running");
+      showNotification("走動時間到了", "可以回到座位，準備下一輪久坐提醒。");
+    }
+
+    function startCountdown() {
+      if (remainingSeconds <= 0) {
+        remainingSeconds = totalSeconds;
+      }
+      timerShell.classList.remove("flash");
+      timerFace.classList.remove("is-alert");
+      message.textContent = currentMode === "break"
+        ? "走動倒數中，慢慢伸展一下。"
+        : "計時中，等一下我會提醒你起身。";
+      setRunning(true);
+      updateScreen();
+      endAt = Date.now() + remainingSeconds * 1000;
+      updateQrCode();
+      publishState();
+      timerId = window.setInterval(() => {
+        remainingSeconds = endAt ? Math.max(0, Math.ceil((endAt - Date.now()) / 1000)) : remainingSeconds - 1;
+        if (remainingSeconds <= 0) {
+          remainingSeconds = 0;
+          updateScreen();
+          window.clearInterval(timerId);
+          timerId = null;
+          if (currentMode === "work") {
+            notifyWorkDone();
+            startBreakTimer();
+          } else {
+            setRunning(false);
+            notifyBreakDone();
+            currentMode = "done";
+          }
+          publishState();
+          return;
+        }
+        updateScreen();
+        publishState();
+      }, 1000);
+    }
+
+    function startBreakTimer() {
+      currentMode = "break";
+      totalSeconds = breakSeconds;
+      remainingSeconds = totalSeconds;
+      endAt = Date.now() + remainingSeconds * 1000;
+      timerShell.classList.remove("flash");
+      timerFace.classList.remove("is-alert");
+      updateScreen();
+      updateQrCode();
+      startCountdown();
+    }
+
+    function resetTimer(text = "已重設，準備下一輪。") {
+      stopTimer();
+      currentMode = "work";
+      totalSeconds = Number(minutesInput.value) * 60;
+      remainingSeconds = totalSeconds;
+      endAt = null;
+      timerShell.classList.remove("flash");
+      timerFace.classList.remove("is-alert");
+      message.textContent = text;
+      statusText.textContent = "準備開始";
+      updateScreen();
+      updateQrCode();
+      publishState();
+    }
+
+    startPause.addEventListener("click", () => {
+      if (timerId) {
+        stopTimer();
+        message.textContent = "先暫停一下，想繼續再按開始。";
+      } else {
+        if (currentMode === "done") {
+          resetTimer("準備開始下一輪。");
+        }
+        startCountdown();
+      }
+    });
+
+    resetButton.addEventListener("click", () => resetTimer());
+    standNow.addEventListener("click", () => {
+      stopTimer();
+      message.textContent = "很好，現在開始 10 分鐘走動倒數。";
+      startBreakTimer();
+    });
+
+    minutesInput.addEventListener("input", () => {
+      minutesValue.textContent = minutesInput.value;
+      if (!timerId) resetTimer("間隔已更新，準備開始。");
+    });
+
+    document.querySelectorAll("[data-minutes]").forEach((button) => {
+      button.addEventListener("click", () => {
+        minutesInput.value = button.dataset.minutes;
+        resetTimer(`${button.dataset.minutes} 分鐘間隔已套用。`);
+      });
+    });
+
+    notifyButton.addEventListener("click", async () => {
+      if (!("Notification" in window)) {
+        message.textContent = "這個瀏覽器不支援桌面通知。";
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      message.textContent = permission === "granted"
+        ? "桌面通知已開啟。"
+        : "沒有開啟通知也沒關係，這個畫面仍會提醒你。";
+    });
+
+    copyMobileLink.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(mobileLink.href);
+        mobileHint.textContent = "手機倒數連結已複製。也可以直接掃 QR CODE。";
+      } catch (error) {
+        mobileHint.textContent = "無法自動複製；可以手動輸入下方網址。";
+      }
+    });
+
+    updateScreen();
+    updateQrCode();
+    publishState();
+    pollRemoteState();
+    window.setInterval(pollRemoteState, 1000);
+  </script>
+</body>
+</html>
